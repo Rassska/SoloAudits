@@ -1,11 +1,40 @@
 
-# Codebase Analysis
-- ## Test Coverage and Code Quality
-    The research over the audit scope provided by Asymmetry Finance confirms that the quality of the code is on pretty decent level.
-  
+# Overall Analysis
+* ## About the Protocol
+    > [Asymmetry Finance](https://www.asymmetry.finance/) provides an opportunity for stakers to diversify their staked eth across many liquid staking derivatives. It's not a doubt that the Lido has about 80% of the liquid staking market and Asymmetry Finance introduces a great solution to make the LSM more decentralized. 
 
-# EIP-4895 Integration Research
+</br>
+
+* ## Test Coverage and Code Quality
+    * The research made over the scope provided by Asymmetry Finance confirms that the quality of the code is on pretty decent level. However, lack of the documentation makes it a little harder to understand the overall architecture behind Asymmetry Finance. Fortunately, the team took some efforts towards documenting the NatSpec for almost all the functions within a scope. For further code readability improvements, consider utilizing: modifiers, named return values. Although, it slightly increases the bytecode size, but it provides an intrinsic gas consumption optimization along with a great readability.
+
+    * The test coverage is well-defined, thus it covers the crucial logic in a very solid way. Also, it gives a huge help in order to follow the main components, like `stake()` and `unstake()` for auditors. The recommendations towards utilizing fuzzing tools or Certora Prover are relevant for protocol's safety against potential edge cases with a significant impact missed after the manual review. 
+    
+
+</br>
+
+# EIP-4895 Integration Analysis
+* ## About the EIP-4895
+  * [EIP-4895](https://eips.ethereum.org/EIPS/eip-4895) is about providing an opportunity for validators:
+    * to move their CL rewards to EL increasing the capital efficiency. This happens automatically upon an upcoming network fork. 
+    * to exit from the beacon chain and fully recieve their staked eth.
+  * Therefore, it's pretty important for liquid staking protocols to integrate this feature for a better compliance. 
   
+</br>
+
+* ## Withdrawals Architecture Proposed by Lido
+  * We'll consider the withdrawal design proposed by Lido as an example so that the Asymmetry Finance could figure out about building a proper interface to interact with an underlying derivatives. 
+  * According to a [feature/shapella-upgrade branch](https://github.com/lidofinance/lido-dao/tree/feature/shapella-upgrade), Lido is intending to process all withdrawals though their withdrawal queue. 
+
+```mermaid
+flowchart LR
+
+A[Hard] -->|Text| B(Round)
+B --> C{Decision}
+C -->|One| D[Result 1]
+C -->|Two| E[Result 2]
+```
+
 
 # Asymmetry Improvement Proposals
 
