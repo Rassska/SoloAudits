@@ -24,17 +24,20 @@
 
 * ## Withdrawals Architecture Proposed by Lido
   * We'll consider the withdrawal design proposed by Lido as an example so that the Asymmetry Finance could figure out about building a proper interface to interact with an underlying derivatives. 
-  * According to a [feature/shapella-upgrade branch](https://github.com/lidofinance/lido-dao/tree/feature/shapella-upgrade), Lido is intending to process all withdrawals though their withdrawal queue. 
+  * According to a [feature/shapella-upgrade branch](https://github.com/lidofinance/lido-dao/tree/feature/shapella-upgrade), Lido is intending to process all withdrawals though their withdrawal queue. The higher perspective over the withdrawal feature is defined below:
 
     ```mermaid
-    flowchart LR
-
-    A[Hard] -->|Text| B(Round)
-    B --> C{Decision}
-    C -->|One| D[Result 1]
-    C -->|Two| E[Result 2]
+    sequenceDiagram
+        participant Lido_Staker
+        participant Withdrawal_Queue
+        participant Finalize_Role 
+        participant Lido 
+        participant Accounting_Oracle
+        Lido_Staker->>Withdrawal_Queue: request withdrawals (stETH/wstETH)
+        Accounting_Oracle->>Lido: submits report, rebase happens here
+        Finalize_Role->>Withdrawal_Queue: finalizes the batch of withdrawals
+        Lido_Staker->>Withdrawal_Queue: claims withdrawals
     ```
-
 
 # Asymmetry Improvement Proposals
 
