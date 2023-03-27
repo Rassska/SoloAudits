@@ -26,14 +26,14 @@
   * We'll consider the withdrawal design proposed by Lido as an example so that the Asymmetry Finance could figure out about building a proper interface to interact with an underlying derivatives. 
   * According to a [feature/shapella-upgrade branch](https://github.com/lidofinance/lido-dao/tree/feature/shapella-upgrade), Lido is intending to process all withdrawals though their withdrawal queue. 
 
-```mermaid
-flowchart LR
+    ```mermaid
+    flowchart LR
 
-A[Hard] -->|Text| B(Round)
-B --> C{Decision}
-C -->|One| D[Result 1]
-C -->|Two| E[Result 2]
-```
+    A[Hard] -->|Text| B(Round)
+    B --> C{Decision}
+    C -->|One| D[Result 1]
+    C -->|Two| E[Result 2]
+    ```
 
 
 # Asymmetry Improvement Proposals
