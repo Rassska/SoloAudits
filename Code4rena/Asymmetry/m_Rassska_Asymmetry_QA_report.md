@@ -1,7 +1,7 @@
 
 # Codebase Analysis
 - ## Test Coverage and Code Quality
-        The research over the audit scope provided by Asymmetry Finance confirms that the quality of the code is on pretty decent level. 
+    <p>The research over the audit scope provided by Asymmetry Finance confirms that the quality of the code is on pretty decent level. </p>
   
 
 # EIP-4895 Integration Research
