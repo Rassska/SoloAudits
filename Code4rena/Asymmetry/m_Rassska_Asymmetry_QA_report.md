@@ -34,14 +34,17 @@
         participant LidoELRewards_Vault 
         participant Lido_DAO 
         participant ValidatorExitBus_Oracle
+        participant RandomLidoValidator
 
-        Lido_Staker->>Withdrawal_Queue: requests withdrawals (stETH/wstETH)
+        Lido_Staker->>Withdrawal_Queue: requests withdrawals by burning(stETH/wstETH)
         Lido_DAO->>ValidatorExitBus_Oracle: exit the validator according to the DAO policy
         ValidatorExitBus_Oracle->>Lido_DAO: sends unstaked eth
         Lido_DAO->>Finalize_Role: sends unstaked eth to process withdrawals
+        RandomLidoValidator->>LidoELRewards_Vault: sends rewards after proposing a block on CL
         LidoELRewards_Vault->>Finalize_Role: sends EL and MEV rewards
         Finalize_Role->>Withdrawal_Queue: finalizes the batch of withdrawals
         Lido_Staker->>Withdrawal_Queue: claims withdrawals
+        Withdrawal_Queue->>Lido_Staker: sends some fresh eth
 
     ```
 
