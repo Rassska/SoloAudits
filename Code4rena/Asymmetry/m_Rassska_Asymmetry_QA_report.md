@@ -31,18 +31,18 @@
         participant Lido_Staker
         participant Withdrawal_Queue
         participant Finalize_Role 
-        participant Lido 
-        participant Accounting_Oracle
+        participant LidoELRewards_Vault 
         participant Lido_DAO 
         participant ValidatorExitBus_Oracle
 
-        Lido_Staker->>Withdrawal_Queue: request withdrawals (stETH/wstETH)
-        Accounting_Oracle->>Lido: submits report, rebase happens here
+        Lido_Staker->>Withdrawal_Queue: requests withdrawals (stETH/wstETH)
         Lido_DAO->>ValidatorExitBus_Oracle: exit the validator according to the DAO policy
+        ValidatorExitBus_Oracle->>Lido_DAO: sends unstaked eth
         Lido_DAO->>Finalize_Role: sends unstaked eth to process withdrawals
-        Lido->>Finalize_Role: sends EL and MEV rewards
+        LidoELRewards_Vault->>Finalize_Role: sends EL and MEV rewards
         Finalize_Role->>Withdrawal_Queue: finalizes the batch of withdrawals
         Lido_Staker->>Withdrawal_Queue: claims withdrawals
+
     ```
 
 # Asymmetry Improvement Proposals
