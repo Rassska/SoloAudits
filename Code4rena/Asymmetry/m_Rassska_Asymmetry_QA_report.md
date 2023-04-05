@@ -10,6 +10,18 @@
 
     * The test coverage is well-defined, thus it covers the crucial logic in a very solid way. Also, it gives a huge help in order to follow the main components, like `stake()` and `unstake()` for auditors. The recommendations towards utilizing fuzzing tools or Certora Prover are relevant for protocol's safety against potential edge cases with a significant impact missed after the manual review. 
     
+</br>
+
+* ## Centralization Risks
+  * The current implementation allows for the SafEth Owner to sweep all the underlying ETH by adding malicious derivative, adjusting the 100% weight to that and then invoking `rebalanceToWeights()`. As a result of that, 100% of user's assets are lost. Anyways, there is a risk of the wallet being compromised and the attacker could simply perform the following attack. In order to mitigate this, introduce a timelock upon adding new derivative, so that users could potentially save their underlying eth.
+  
+  * Since derivatives are also upgradeable contracts, it is possible for proxy admins to replace the implementation with a malicious one and then destroy the proxy stealing all the funds held by a certain derivative. In order to prevent such risks, introduce the multi-sig wallet as an Owner for Safeth.
+
+</br>
+
+* ## Re-entrancy protection
+  * Currently, `stake()` and `unstake()` functions are not covered with `nonReentrant` modifier from [OZ](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/security/ReentrancyGuard.sol). It could potentially allow to generate some exploitable scenarios by staking, making some manipulations, and unstaking in the same tx (e.g. in order to repay the flash loan fee). However, the motivation behind not doing this is clear, it consumes a lot of gas for setting/unsetting the mutex flag. If the Asymmetry decides to protect those function, consider reading about the following design which introduces [Re-entrancy Guard 2.0](https://medium.com/spherex-technologies/reentrancy-guard-2-0-cbbc0be41634)
+  
 
 </br>
 
@@ -22,7 +34,7 @@
   
 </br>
 
-* ## Withdrawals Architecture Proposed by Lido
+* ## Withdrawals Architecture Proposed by the Lido
   * We'll consider the withdrawal design proposed by Lido as an example so that the Asymmetry Finance could figure out about building a proper interface to interact with an underlying derivatives. 
   * According to a [feature/shapella-upgrade branch](https://github.com/lidofinance/lido-dao/tree/feature/shapella-upgrade), Lido is intending to process all withdrawals though their withdrawal queue. The higher perspective over the withdrawal feature is defined below:
 
@@ -45,203 +57,173 @@
         Finalize_Role->>Withdrawal_Queue: finalizes the batch of withdrawals
         Lido_Staker->>Withdrawal_Queue: claims withdrawals
         Withdrawal_Queue->>Lido_Staker: sends some fresh eth
-
     ```
+  
+  * For Asymmetry Finance it will be quite challenging to process withdrawals, since every LSD has its own difficulties. In a case with Lido, we can see that it takes some time to process a single withdrawal, cuz it should be finalized first. Since Asymmetry Finance is built on top of several LSDs, we can't simply ask for `derivative[i].balance() * _safEthAmount / safEthTotalSupply` and withdraw that amount immediately, therefore we need some aggregated solution here. Some straight forward idea to deal with that could be about leveraging some special reserves allocated only for processing withdrawals, but the capital efficiency of those reserves is not on a high level.
 
+</br>
+
+* ## Additional Caveats
+  * Some extra delays between requesting and claiming withdrawals might occur in case if the validators of LSDs perform very poorly. Although it might be an unexpected case, where the client running by validators might have a bug, which might be the case for slashing. Lido has a special mechanism called "bunker mode" to deal with a negative rebase(under a massive slashing). Once the bunker mode is enabled, it takes about 36 days to enter a "turbo mode" back. Asymmetry Finance should consider some unexpected cases like that to mitigate the risks as much as possible.
+  
+  * Currently the protocol is heavily dependent on a Curve pools in order to perform some withdrawals. However, Asymmetry Finance should encounter the market instabilities. Let's say, AccountingOracle in Lido is about to submit the report with a negative rebase. After simulating this transaction, some mev bots will try to front-run this tx by dumping stETH in order to exchange for eth, because after a negative rebase happens, stETH could inflate a little, since the shares are the same, but the underlying eth decresed(as a result of slashing). After the report is submitted the stakers also will rush to dump their stETH on Curve. This results in having less and less liquidity in Curve pool, since everyone is trying to save their stETH. Now, the developers behind Asymmetry see this wild moment and they decide to set the weight for Lido to 0. After that the rebalance has to be called, but unfortunately, due to the slippage, it's not possible to exchange the stETH held by Asymmetry Finance. You can find some Wild market discussions with a Curve Founder here: 
+  https://t.me/ETHSecurity/68819
+   
 # Asymmetry Improvement Proposals
 
 
+* ## Low Severity Issues
+  * **[[AIPL-01] Add an extra check when depositing to RocketPool derivative](#aipl-01-add-an-extra-check-when-depositing-to-rocketpool-derivative)**
+  * **[[AIPL-02] The future growth problems associated with the number underlying of derivatives]()**
+  * **[[AIPL-03] The risks behind adjusting the weight for non-existing derivative]()**
+  * **[[AIPL-04] It's possible to set the max slippage for non-existing derivative]()**
+  * **[[AIPL-05] The underlying wstETH could be trapped, since the stETH is pausable]()**
+  * **[[AIPL-06] Pause `stake()`/`unstake()` untill the protocol is ready to process]()**
+  * **[[AIPL-07] An assertion over `totalSupply() > 0` seems relevant upon unstaking]()**
+  * **[[AIPL-08] Unchecked return value upon `IERC20().approve/transfer/transferFrom`]()**
+</br>
 
-
-## Table of contents
-
-- **[[L-01] Lack of arrays length check]()**
-- **[[L-02] Hardcoded `chainId` might become problematic upon network hard forks]()**
-- **[[L-03] Guardian might accidentally sign `stakingModule` pause proposal providing insecure arguments]()**
-- **[[L-04] Hardcoded staking module limit doesn't fit with `validStakingModuleId`]()**
-- **[[L-05] Use overflow resistant formula for computing med in binary search]()**
+* ## Non-Critical Severity Issues
 
 </br>
 
-## **[L-01] Lack of arrays length check**<a name="L-01"></a>
+## **[AIPL-01] Add an extra check when depositing to RocketPool derivative**<a name="AIPL-01"></a>
 
-### ***Description:***
--  When passing several sequences in a case they supposed to match, it's better to clearly define an invariant which covers a length mismatch. It mitigates any risks associated with non-compliant payload.
+- In [Reth.sol](https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/derivatives/Reth.sol) there is a check to identify an ability to deposit directly to the pool. Currently this check consist of two parts: 
+  - If the `msg.value >= rocketDAOProtocolSettingsDeposit.getMinimumDeposit()`
+  - If the `rocketDepositPool.getBalance() + _amount <= rocketDAOProtocolSettingsDeposit.getMaximumDepositPoolSize()`
+
+  - And there is no check for whether deposits are enabled or not. Which is presented here: 
+https://etherscan.io/address/0x2cac916b2A963Bf162f076C0a8a4a8200BCFBfb4#code#F7#L103 
+
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/derivatives/Reth.sol#L146-L149
+
+### ***Recommendations***
+
+- Short term: 
+  - Consider placing the following check described above.
+- Long term: N/A
+
+</br>
+
+## **[AIPL-02] The future growth problems associated with the number of underlying derivatives**<a name="AIPL-02"></a>
+
+-  Adding new derivates leads to an increased gas consumption for both `stake()` and `unstake()` functions. Therefore, it's not reasonable for the each `stake()`/`unstake()` to spend several millions of gas units.
+
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L108-L129
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L63-L101
+
+### ***Recommendations***
+
+- Short term: N/A
+- Long term: Consider this submission as a note to think about the troubles that could occur in the future. Unfortunately, there is no an easy solution here, since it probably requires a little architecture re-design. 
+
+</br>
+
+## **[AIPL-03] The risks behind adjusting the weight for non-existing derivative**<a name="AIPL-03"></a>
+
+-  In [SafEth.sol](https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol) there is a function `adjustWeight()` which is used to change the derivative weight. However, there is no an invariant placed to check whether `derivatives[_derivativeIndex]` exists or not, hence there is a risk of setting the weight for non-existing derivative. 
+
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L165-L175
+
+### ***Recommendations***
+
+- Short term: 
+  - In order to mitigate that risk, consider placing an appropriate assertion. In order to avoid additional warm-access SLOAD, cache the `derivativeCount` into the memory.
+- Long term: N/A
+
+</br>
+
+## **[AIPL-04] It's possible to set the max slippage for non-existing derivative**<a name="AIPL-04"></a>
+
+- In [SafEth.sol](https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol) there is a function `setMaxSlippage()` for managing the minOut amount upon processing various exchanges in a secondary market. The owner might accidentally set the max slippage for non-existing derivative thinking that everything is okay. The flow could look like that: 
+
+    ```mermaid
+    sequenceDiagram
+        participant SafEth_Owner
+        participant rebalanceToWeights()
+        participant RandomDerivative
+        participant CurvePool
+        participant setMaxSlippage()
+
+        SafEth_Owner->>rebalanceToWeights(): tries to rebalance the weights
+        rebalanceToWeights()->>RandomDerivative: sends withdrawal request  
+        RandomDerivative->>CurvePool: tries to exchange with a pre-setted slippage
+        CurvePool->>RandomDerivative: fails because of the slippage >1%
+        RandomDerivative->>rebalanceToWeights(): reports the failure
+        SafEth_Owner->>setMaxSlippage(): slightly increases the slippage in rush, but accidentally for non-existing derivative 
+        SafEth_Owner->>rebalanceToWeights(): tries again to rebalance the weights
+        rebalanceToWeights()->>RandomDerivative: sends withdrawal request  
+        RandomDerivative->>CurvePool: tries to exchange with a pre-setted slippage
+        CurvePool->>RandomDerivative: fails because of the slippage >1%
+        RandomDerivative->>rebalanceToWeights(): reports the failure
+        SafEth_Owner->>SafEth_Owner: is upset now, since he losts some eth for failures
+    ```
+- Of course, it happens in theory, but very low chance that this scenario comes in reality. Anyways, an invariant placed to prevent such risks is absolutely relevant.
+
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L202-L208
+### ***Recommendations***
+- Short term: Place an appropriate assertion to prevent that from happening.
+- Long term: N/A
+
+</br>
+
+## **[AIPL-05] The underlying wstETH could be trapped, since the stETH is pausable**<a name="AIPL-05"></a>
+
+-  Although, it's clear that the dApps should work with wstETH, since the stETH is rebasable(check out the stETH/wstETH integration [guide](https://docs.lido.fi/guides/steth-integration-guide/)), however, in this case, there is a small risk behind trapping all the underlying wstETH if the stETH is paused by an emergency case.
+
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/derivatives/WstEth.sol#L59
+
+### ***Recommendations***
+
+- Short term: 
+  - Provide a way for stakers to access their wstETH, even if the stETH is paused. The stakers could use wstETH directly to get a collateralized loan on Aave or MakerDAO or simply exchange using AMM pools.
+- Long term: N/A
+
+</br>
+
+
+## **[AIPL-06] Pause `stake()`/`unstake()` untill the protocol is ready to process**<a name="AIPL-06"></a>
+
+- It's pretty popular to pause the key functionality untill everything settles down correctly. It helps to mitigate some possible shares manipulation risks due to the fact that not everything is setted correctly at some point of time. Or in some cases, there might be an oppotunity to front-run the tx which sets something crucial. 
   
-
-  
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    contracts/0.8.9/StakingRouter.sol#260-269
-    contracts/0.8.9/StakingRouter.sol#271-303
-   ```
-### ***Tool used:***
-- Manual review + ChatGPT :D
-
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L48-L56
 
 ### ***Recommendations***
 - Short term: 
-  - Make sure to review all occurances above
-  - Apply the following diff on one of the occurance:  
+  - Consider pausing an opportunity to stake/unstake in `initialize()` untill the protocol is ready to operate.
+  
+- Long term: N/A 
+
+</br>
+
+## **[AIPL-07] `totalSupply()` should be >0 upon unstaking**<a name="AIPL-07"></a>
+
+- An extra invariant could be placed upon unstaking to make sure that at least one staking was performed before an unstake.
+  
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/SafEth.sol#L109-L111
+
+### ***Recommendations***
+- Short term: 
+  - Consider the following assertion:
     ```Solidity
-        function reportRewardsMinted(uint256[] calldata _stakingModuleIds, uint256[] calldata _totalShares)
-            external
-            onlyRole(REPORT_REWARDS_MINTED_ROLE)
-        {
-    ++      require(_stakingModuleIds.length == _totalShares.length, "...") // or revert with custom error
-            for (uint256 i = 0; i < _stakingModuleIds.length; ) {
-                address moduleAddr = _getStakingModuleById(_stakingModuleIds[i]).stakingModuleAddress;
-                IStakingModule(moduleAddr).onRewardsMinted(_totalShares[i]);
-                unchecked { ++i; }
-            }
-        }
+      require(pauseUnstaking == false, "unstaking is paused");
+      uint256 safEthTotalSupply = totalSupply();
+      uint256 ethAmountBefore = address(this).balance;
+      assert(safEthTotalSupply > 0);
     ```
   
 - Long term: N/A 
 
 </br>
 
-## **[L-02] Hardcoded `chainId` might become problematic upon network hard forks**<a name="L-02"></a>
+## **[AIPL-08] Unchecked return value upon `IERC20().approve/transfer/transferFrom`**<a name="AIPL-08"></a>
+- According to the [JPL Institutional Coding Standard for the C Programming Language](https://www.youtube.com/watch?v=Wm3t8Fuiy1E&t=86s), quote, every return value must be used or explicitly discarded. 
 
-### ***Description:***
--  In `DepositSecurityModule.sol` there is a function `pauseDeposits()` which allows for anyone having the signature signed by guardian to pause the staking module. The message hash defined in the following way: 
-   -  ```Solidity          
-        bytes32 msgHash = keccak256(abi.encodePacked(PAUSE_MESSAGE_PREFIX, blockNumber, stakingModuleId));
-        ```
-    where the `PAUSE_MESSAGE_PREFIX` is an immutable defined in the following way: 
-    - ```Solidity
-        PAUSE_MESSAGE_PREFIX = keccak256(
-            abi.encodePacked(
-                // keccak256("lido.DepositSecurityModule.PAUSE_MESSAGE")
-                bytes32(0x9c4c40205558f12027f21204d6218b8006985b7a6359bcab15404bcc3e3fa122),
-                block.chainid,
-                address(this)
-            )
-        );
-        ```
-        Everything seems okay, but there is a little risk behind hardcoding `PAUSE_MESSAGE_PREFIX` during network hard forks.
-  
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    contracts/0.8.9/DepositSecurityModule.sol#336-365
-   ```
-### ***Tool used:***
-- Manual review + ChatGPT :D
-
-
+- https://github.com/code-423n4/2023-03-asymmetry/blob/main/contracts/SafEth/derivatives/WstEth.sol#L59
 ### ***Recommendations***
-Make sure to review all occurances above.
-
-- Short term: Consider using the same approach for message hash building as in `EIP712StETH.sol`.
-- Long term: N/A
-
-</br>
-
-## **[L-03] Guardian might accidentally sign `StakingModule` pause proposal providing insecure arguments**<a name="L-03"></a>
-
-### ***Description:***
--  In `DepositSecurityModule.sol` there is a function `pauseDeposits()` which allows for anyone having the signature signed by guardian to pause the staking module. Let's say guardian accidentally signed the payload with the following params:
-   -  blockNumber: 0
-   -  stakingModuleId: anySufficientID
-  
--   Now the permiter uses the signature to pause `StakingModule`, hence everyone can reuse the payload to pause `StakingModule`. It's possible, because `block.number - blockNumber >> pauseIntentValidityPeriodBlocks`. The `blockNumber` should not be equal to zero for making this happen. The guardian could simply miss an additional zero at the end of the value, which also could make a decent difference.
-  
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    contracts/0.8.9/DepositSecurityModule.sol#336-365
-   ```
-### ***Tool used:***
-- Manual review + ChatGPT :D
-
-
-### ***Recommendations***
-Make sure to review all occurances above.
-
-- Short term: Unfortunately, there is no straightforward solution here to mitigate the risks above. 
-- Long term: N/A
-
-</br>
-
-## **[L-04] Hardcoded staking module limit doesn't fit with `validStakingModuleId`**<a name="L-04"></a>
-
-### ***Description:***
-- The function `addStakingModule()` allows to add up to 32 staking modules, however, the modifier `validStakingModuleId` defines [0, type(uint24).max] possible ids for staking modules. 
-  
-
-
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    contracts/0.8.9/StakingRouter.sol#183
-   ```
-### ***Tool used:***
-- Fuzzing: Echidna
-
-
-### ***Recommendations***
-- Short term: Consider fixing that mismatch between allowed staking module ids. 
+- Short term: Consider placing corresponding assertion upon `IERC20().approve()`.
 - Long term: N/A 
 
 </br>
 
-## **[L-05] Use overflow resistant formula for computing med in binary search**<a name="L-05"></a>
-
-### ***Description:***
-- The current `uint256 mid = (max + min) / 2` has no any problems computing mid, but in theory it could potentially overflow. To mitigate this, it's possible to compute the mid in the following way: 
-
-    ```Solidity
-        uint256 mid = min + (max - min) >> 1
-    ```
-It's a little bit optimized as well.
-
-
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    contracts/0.8.9/WithdrawalQueueBase.sol#206
-    contracts/0.8.9/WithdrawalQueueBase.sol#165
-   ```
-### ***Tool used:***
-- Fuzzing: Echidna
-
-
-### ***Recommendations***
-- Short term: Consider applying diff above.
-- Long term: N/A 
-
-</br>
-
-## **[G-01] Unset the claimed request from the queue in order to get gas refund**<a name="G-01"></a>
-
-### ***Description:***
-- After withdrawal batch gets finalized, owners are capable of claiming their requested withdrawals from the queue. It's better to reset withdrawal request which has been claimed providing to the user some gas refund. That would make intrinsic gas consumption cheaper up to the 50%. 
-
-### ***All occurances:***
-
-- Contracts:
-
-   ```bash
-    file: contracts/0.8.9/WithdrawalQueueBase.sol#408-426
-   ```
-### ***Tool used:***
-- Manual review
-
-
-### ***Recommendations***
-- Short term: Consider unsetting withdrawal request's attributes which has been claimed.  
-- Long term: N/A 
-
-</br>
