@@ -25,7 +25,6 @@
     * $$mintAmount[1] = \frac{4.9766101e+18}{1e18}$$
     
 
-
   * Everything seems to be okay, until the weights change. 
     * Let's say now, Asymmetry add another derivative and adjust the weights:
       * stETH: `weights[0] = 1e18,`

@@ -59,7 +59,7 @@
         Withdrawal_Queue->>Lido_Staker: sends some fresh eth
     ```
   
-  * For Asymmetry Finance it will be quite challenging to process withdrawals, since every LSD has its own difficulties. In a case with Lido, we can see that it takes some time to process a single withdrawal, cuz it should be finalized first. Since Asymmetry Finance is built on top of several LSDs, we can't simply ask for `derivative[i].balance() * _safEthAmount / safEthTotalSupply` and withdraw that amount immediately, therefore we need some aggregated solution here. Some straight forward idea to deal with that could be about leveraging some special reserves allocated only for processing withdrawals, but the capital efficiency of those reserves is not on a high level.
+  * For Asymmetry Finance it will be quite challenging to process withdrawals, since every LSD has its own difficulties. In a case with Lido, we can see that it takes some time to process a single withdrawal, cuz it should be finalized first. Since Asymmetry Finance is built on top of several LSDs, we can't simply ask for `derivative[i].balance() * _safEthAmount / safEthTotalSupply` and withdraw that amount immediately, therefore we need some aggregated solution here. Some straight forward idea to deal with that could be about leveraging some special reserves allocated only for processing withdrawals, but the capital efficiency of those reserves is not on a high level. 
 
 </br>
 
