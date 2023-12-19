@@ -1,0 +1,10 @@
+## All results in one table
+
+|       | **Protocol Name** |                                      **Results**                                     | **Shares** |                                               **Report**                                              | **Contest Platform** |
+|-------|:-----------------:|:------------------------------------------------------------------------------------:|------------|:-----------------------------------------------------------------------------------------------------:|:--------------------:|
+| **1** |        Lido       |                          [1/7](https://t.me/c/1904495328/69)                         |   $13,071  | [click](https://github.com/Rassska/SoloAudits/blob/main/PrivateAudits/m_Rassska_Lido_audit_report.md) |      Stronghold      |
+| **2** |  Asymmetry_safETH |            [5/246](https://code4rena.com/audits/2023-03-asymmetry-contest)           |   $1,057   |      [click](https://github.com/Rassska/SoloAudits/tree/main/Code4rena/Asymmetry_safETH/reports)      |       Code4rena      |
+| **3** |      KelpDAO      |                  [1/194](https://code4rena.com/reports/2023-11-kelp)                 |   $1,250   |          [click](https://github.com/Rassska/SoloAudits/tree/main/Code4rena/Kelp_DAO/reports)          |       Code4rena      |
+| **4** |  Asymmetry_afETH  | [4/5](https://code4rena.com/audits/2023-09-asymmetry-finance-afeth-invitational#top) |   $3,062   |       [click](https://github.com/Rassska/SoloAudits/tree/main/Code4rena/Asymmetry_afETH/reports)      |       Code4rena      |
+| **5** |     Centrifuge    |               [78/84](https://code4rena.com/audits/2023-09-centrifuge)               |     $12    |         [click](https://github.com/Rassska/SoloAudits/tree/main/Code4rena/Centrifuge/reports)         |       Code4rena      |
+| **6** |    The Wildcat    |                [NA/144](https://code4rena.com/reports/2023-10-wildcat)               |     N/A    |           [click](https://github.com/Rassska/SoloAudits/tree/main/Code4rena/Wildcat/reports)          |       Code4rena      |
