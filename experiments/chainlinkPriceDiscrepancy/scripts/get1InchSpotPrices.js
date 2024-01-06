@@ -6,12 +6,12 @@ const fs = require("fs");
 const { Network, Alchemy, Utils} = require('alchemy-sdk');
 const { Web3 } = require('web3');
 
+require('dotenv').config();
 
 const settings = {
-    apiKey: 'w4iGdDwlbhkAWygEmNbqElo0hTZWCa-s',
-    apiURL: 'https://eth-mainnet.g.alchemy.com/v2/w4iGdDwlbhkAWygEmNbqElo0hTZWCa-s',
+    apiKey: process.env.apiKey,
+    apiURL: process.env.apiURL,
     network: Network.ETH_MAINNET,
-
 };
 
 

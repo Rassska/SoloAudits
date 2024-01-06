@@ -7,11 +7,12 @@ const { Network, Alchemy, Utils} = require('alchemy-sdk');
 const { Web3 } = require('web3');
 const jsonMerger = require("json-merger");
 
-const settings = {
-    apiKey: 'w4iGdDwlbhkAWygEmNbqElo0hTZWCa-s',
-    apiURL: 'https://eth-mainnet.g.alchemy.com/v2/w4iGdDwlbhkAWygEmNbqElo0hTZWCa-s',
-    network: Network.ETH_MAINNET,
+require('dotenv').config();
 
+const settings = {
+    apiKey: process.env.apiKey, 
+    apiURL: process.env.apiURL, 
+    network: Network.ETH_MAINNET,
 };
 
 
